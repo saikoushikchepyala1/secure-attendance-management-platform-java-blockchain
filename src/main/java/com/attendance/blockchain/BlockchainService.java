@@ -11,6 +11,7 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.StaticGasProvider;
 
 import java.math.BigInteger;
@@ -20,13 +21,12 @@ import java.util.Collections;
 @Service
 public class BlockchainService {
 
+    // Retain variable names used in other files
+    private final Object contract = new Object(); // Dummy to avoid build breaks
     private final Web3j web3j;
     private final Credentials credentials;
     private final StaticGasProvider gasProvider;
     private final String contractAddress;
-
-    // Dummy variable to keep the name "contract" used elsewhere in the project
-    private final Object contract = new Object();
 
     public BlockchainService(
             @Value("${web3j.client-address}") String rpcUrl,
