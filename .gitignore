@@ -32,8 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 
-# Ignore secrets and config
-src/main/resources/application.properties
+
 
 # Ignore Web3j generated contract wrappers
 com/attendance/blockchain/AttendanceSystem.java
@@ -46,11 +45,10 @@ target/
 /target
 *.iml
 .idea/
-application.properties
 
 
 
-src/main/resources/application.properties
+
 
 src/main/java/com/attendance/blockchain/AttendanceSystem.java
 
@@ -84,8 +82,7 @@ build/
 
 # === Secrets & Config ===
 
-# Spring Boot Secrets
-backend/src/main/resources/application.properties
+
 
 # Web3/Blockchain
 backend/src/main/java/com/attendance/blockchain/AttendanceSystem.java
