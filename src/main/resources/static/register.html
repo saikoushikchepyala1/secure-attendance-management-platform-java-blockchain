@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register Account</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h2>Register Your Account</h2>
+<form id="registerForm">
+    <input type="hidden" id="token" />
+
+    <label>Name:</label><br>
+    <input type="text" id="name" required /><br><br>
+
+    <label>Password:</label><br>
+    <input type="password" id="password" required /><br><br>
+
+    <label>Department:</label><br>
+    <input type="text" id="department" required /><br><br>
+
+    <button type="submit">Register</button>
+</form>
+
+<p id="result"></p>
+
+<script>
+    // Parse token from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    document.getElementById("token").value = token;
+
+    // Submit form
+    document.getElementById("registerForm").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        const name = document.getElementById("name").value;
+        const password = document.getElementById("password").value;
+        const department = document.getElementById("department").value;
+
+        const response = await fetch("http://localhost:8080/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                token: token,
+                name: name,
+                password: password,
+                department: department
+            }),
+        });
+
+        const text = await response.text();
+        document.getElementById("result").innerText = text;
+    });
+</script>
+</body>
+</html>
