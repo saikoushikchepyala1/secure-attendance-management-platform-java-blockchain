@@ -5,12 +5,16 @@ import com.attendance.model.Attendance;
 import com.attendance.repository.LeaveRequestRepository;
 import com.attendance.repository.AttendanceRepository;
 import com.attendance.repository.WfhRequestRepository;
+import com.attendance.repository.HolidayRepository;
+
 import com.attendance.request.LeaveRequestDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 @RestController
 @RequestMapping("/leave")
@@ -26,11 +30,33 @@ public class LeaveController {
     @Autowired
     private WfhRequestRepository wfhRepo;
 
+    @Autowired
+    private HolidayRepository holidayRepo;
 
-    // ✅ Submit Leave Request
+
     @PostMapping("/request")
     public ResponseEntity<?> requestLeave(@RequestBody LeaveRequestDTO request) {
         LocalDate date = LocalDate.parse(request.getDate());
+
+        LocalDate today = LocalDate.now();
+
+        if (!date.equals(today)) {
+            return ResponseEntity.badRequest().body("Leave request must be for today.");
+        }
+
+        if (holidayRepo.existsByDate(date)) {
+            return ResponseEntity.badRequest().body("Cannot request on a holiday.");
+        }
+
+        LocalTime now = LocalTime.now(ZoneId.of("Asia/Kolkata"));
+        if (now.isAfter(LocalTime.of(10, 0))) {
+            return ResponseEntity.badRequest().body("Too late to request leave. Deadline is 10 AM.");
+        }
+
+        // Reject if already marked attendance
+        if (attendanceRepo.existsByEmployeeIdAndDate(request.getEmployeeId(), date)) {
+            return ResponseEntity.badRequest().body("Attendance already marked for today.");
+        }
 
         if (leaveRepo.existsByEmployeeIdAndDate(request.getEmployeeId(), date)) {
             return ResponseEntity.badRequest().body("Already requested leave for this date.");

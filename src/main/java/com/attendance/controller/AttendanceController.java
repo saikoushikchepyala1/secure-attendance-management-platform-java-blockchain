@@ -5,11 +5,15 @@ import com.attendance.model.Attendance;
 import com.attendance.model.Employee;
 import com.attendance.repository.AttendanceRepository;
 import com.attendance.repository.EmployeeRepository;
+import com.attendance.repository.HolidayRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -24,10 +28,13 @@ public class AttendanceController {
     private AttendanceRepository attendanceRepo;
 
     @Autowired
-    private BlockchainService blockchainService;
+    private EmployeeRepository employeeRepo;
 
     @Autowired
-    private EmployeeRepository employeeRepo;
+    private HolidayRepository holidayRepo;
+
+    @Autowired
+    private BlockchainService blockchainService;
 
     @PostMapping("/mark")
     public ResponseEntity<?> markAttendance(@RequestBody Attendance data) {
@@ -35,6 +42,10 @@ public class AttendanceController {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now(ZoneId.of("Asia/Kolkata"));
         LocalTime cutoff = LocalTime.of(10, 0);
+
+        if (holidayRepo.existsByDate(today)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Today is a holiday. No attendance required.");
+        }
 
         boolean alreadyMarked = attendanceRepo.existsByEmployeeIdAndDate(employeeId, today);
         if (alreadyMarked) {
@@ -48,37 +59,16 @@ public class AttendanceController {
 
         if (now.isAfter(cutoff)) {
             status = "ABSENT";
-            message = "You are late. Marked as ABSENT and saved to blockchain.";
+            message = "You are late. Marked as ABSENT.";
         } else {
             status = "PRESENT";
-            message = "Attendance marked as PRESENT and saved to blockchain.";
+            message = "Attendance marked as PRESENT.";
         }
 
         data.setStatus(status);
         attendanceRepo.save(data);
 
-        try {
-            blockchainService.logAttendance(
-                    employeeId,
-                    today.toString(),
-                    mapStatusToEnum(status)
-            );
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Blockchain logging failed.");
-        }
-
         return ResponseEntity.ok(message);
-    }
-
-    private BigInteger mapStatusToEnum(String status) {
-        return switch (status.toUpperCase()) {
-            case "PRESENT" -> BigInteger.valueOf(1);
-            case "ABSENT" -> BigInteger.valueOf(2);
-            case "WFH" -> BigInteger.valueOf(3);
-            case "LEAVE" -> BigInteger.valueOf(4);
-            default -> BigInteger.ZERO;
-        };
     }
 
     @GetMapping("/summary/{empId}")
@@ -105,7 +95,37 @@ public class AttendanceController {
 
     @GetMapping("/calendar/{empId}")
     public List<Attendance> getCalendar(@PathVariable Long empId) {
-
         return attendanceRepo.findByEmployeeId(empId);
+    }
+
+    // Scheduled job to run at 7PM IST daily
+    @Scheduled(cron = "0 0 19 * * ?", zone = "Asia/Kolkata")
+    public void logDailyAttendanceHash() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+
+        if (holidayRepo.existsByDate(today)) {
+            return; // Skip logging if it's a holiday
+        }
+
+        List<Attendance> allToday = attendanceRepo.findByDate(today);
+
+        if (allToday.isEmpty()) return;
+
+        StringBuilder sb = new StringBuilder();
+        for (Attendance a : allToday) {
+            sb.append(a.getEmployeeId())
+                    .append("|")
+                    .append(a.getStatus())
+                    .append(";");
+        }
+
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            String hashHex = String.format("%064x", new BigInteger(1, hashBytes));
+            blockchainService.logDailyHash(today.toString(), hashHex);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
